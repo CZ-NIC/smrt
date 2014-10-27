@@ -1,0 +1,6 @@
+include $(S)/build/Makefile.top
+
+include $(S)/src/Makefile.dir
+include $(S)/build/Makefile.dir
+
+include $(S)/build/Makefile.bottom
