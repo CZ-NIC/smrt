@@ -22,6 +22,9 @@ struct interface {
 static struct interface *interfaces;
 static size_t interface_count;
 
+static link_hook up_hook;
+static link_hook down_hook;
+
 void netstate_init(void) {
 	dbg("Initializing netstate\n");
 	dummy_socket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -42,7 +45,9 @@ static void iflink(size_t i, bool up) {
 	if (interfaces[i].up != up) {
 		dbg("Link of interface %s changed to %s\n", interfaces[i].name, up ? "up" : "down");
 		interfaces[i].up = up;
-		// TODO: Do something about it
+		link_hook hook = up ? up_hook : down_hook;
+		if (hook)
+			hook(interfaces[i].name);
 	}
 }
 
@@ -54,4 +59,9 @@ void netstate_update(void) {
 		} else
 			iflink(i, interfaces[i].ifreq.ifr_flags & IFF_RUNNING);
 	}
+}
+
+void netstate_set_hooks(link_hook up, link_hook down) {
+	up_hook = up;
+	down_hook = down;
 }
