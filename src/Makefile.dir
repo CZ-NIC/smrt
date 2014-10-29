@@ -3,4 +3,5 @@ BINARIES += src/smrtd
 smrtd_MODULES := \
 	main \
 	util \
-	netstate
+	netstate \
+	link
