@@ -4,4 +4,5 @@ smrtd_MODULES := \
 	main \
 	util \
 	netstate \
-	link
+	link \
+	interface
