@@ -38,7 +38,7 @@ bool netlink_event(void) {
 	};
 	ssize_t slen = recvmsg(sock, &msg, MSG_DONTWAIT);
 	if (slen == -1) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
 			return false; // No data now, so no event
 		if (errno == ENOBUFS)
 			return false; // OK, there was not enough memory to send us message. The message may have contained something interesting, so expect it did contain and err on the safe side
