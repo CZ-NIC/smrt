@@ -10,7 +10,7 @@
 
 static int sock = -1;
 
-int netlink_init() {
+int netlink_init(void) {
 	sock = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE);
 	if (sock == -1)
 		die("Couldn't create netlink socket to listen for link up/down messages: %s\n", strerror(errno));
@@ -25,7 +25,7 @@ int netlink_init() {
 
 #define BUF_SIZE 8192
 
-bool netlink_event() {
+bool netlink_event(void) {
 	// Receive message
 	char msg_buf[BUF_SIZE];
 	struct iovec iov = { msg_buf, sizeof msg_buf };
