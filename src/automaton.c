@@ -13,6 +13,7 @@
 
 // TODO: Load from configuration
 #define IMAGE_PATH "/home/vorner/g2_cpe-vdsl-ok.bin"
+#define FW_VERSION "1.03.15"
 
 enum action {
 	AC_ENTER,
@@ -35,6 +36,7 @@ struct extra_state {
 };
 
 static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, 0x0f /* The PM value (just something that is available even without the image) */ };
+static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20 };
 
 struct param_answer {
 	uint8_t cmd;
@@ -184,6 +186,39 @@ static const struct transition *check_image_ack(struct extra_state *state, const
 	}
 }
 
+struct version {
+	uint8_t cmd;
+	uint16_t len;
+	uint16_t seq;
+	uint32_t param;
+	char fw[20];
+	char dsp[20];
+} __attribute__((packed));
+
+static const struct transition *check_version(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)state;
+	const struct version *version = packet;
+	if (packet_size < sizeof *version)
+		return NULL; // Too short a packet
+	if (version->cmd != CMD_ANSWER_PARAM || ntohl(version->param) != PARAM_VERSION)
+		return NULL; // Wrong packet
+	if (strcmp(version->fw, FW_VERSION) != 0) {
+		// Wrong version if image, reset it and load a new one
+		static struct transition result = {
+			.new_state = AS_RESET,
+			.state_change = true
+		};
+		return &result;
+	} else {
+		// All is OK, proceed to setting config
+		static struct transition result = {
+			.new_state = AS_SEND_CONFIG,
+			.state_change = true
+		};
+		return &result;
+	}
+}
+
 static struct node_def defs[] = {
 	[AS_PRESTART] = {
 		.actions = {
@@ -257,6 +292,30 @@ static struct node_def defs[] = {
 			},
 			[AC_PACKET] = {
 				.hook = check_image_ack
+			}
+		}
+	},
+	[AS_ASKED_VERSION] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 100,
+					.timeout_mult = 4,
+					.retries = 2,
+					.timeout_set = true,
+					.packet = ask_version,
+					.packet_size = sizeof ask_version,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = { // Not answering version. Is it still there?
+					.new_state = AS_ASKED_PRESENT,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_version
 			}
 		}
 	},

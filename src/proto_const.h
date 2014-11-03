@@ -8,6 +8,7 @@
 #define CMD_ANSWER_PARAM 6
 
 #define PARAM_PM 0x0f
+#define PARAM_VERSION 0x20
 
 #define IMG_PROCEED 0xFFFFFFFF
 #define IMG_COMPLETE 0xFFFFFFF9
