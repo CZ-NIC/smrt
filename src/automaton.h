@@ -16,6 +16,8 @@ enum autom_state {
 	AS_SEND_FIRMWARE,
 	// Confirm the thing is alive and if the version is OK
 	AS_ASKED_VERSION,
+	// Send a reset command
+	AS_RESET,
 	// Not there or not responding, after fatal heart attack, whatever.
 	AS_DEAD
 };

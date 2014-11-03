@@ -129,6 +129,8 @@ static void packet_send(struct interface_state *interface) {
 }
 
 static void transition_perform(struct interface_state *interface, uint64_t now, const struct transition *transition) {
+	if (!transition) // It is allowed to perform no transition as a result of some event
+		return;
 	// The timeout
 	if (transition->timeout_set) {
 		interface->timeout = transition->timeout;

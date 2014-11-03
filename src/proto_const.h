@@ -1,0 +1,13 @@
+#ifndef SMRT_PROTO_CONST_H
+#define SMRT_PROTO_CONST_H
+
+#define CMD_OFFER_IMAGE 1
+#define CMD_IMG_ACK 3
+#define CMD_GET_PARAM 5
+#define CMD_ANSWER_PARAM 6
+
+#define PARAM_PM 0x0f
+
+#define IMG_PROCEED 0xFFFFFFFF
+
+#endif
