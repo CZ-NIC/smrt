@@ -5,4 +5,5 @@ smrtd_MODULES := \
 	util \
 	netstate \
 	link \
-	interface
+	interface \
+	automaton

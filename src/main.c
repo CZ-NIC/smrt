@@ -127,10 +127,12 @@ int main(int argc, const char *argv[]) {
 		int timeout = -1;
 		for (size_t i = 0; i < interface_count; i ++) {
 			int it = interface_timeout(interfaces[i].state, now);
+			assert(it >= -1);
 			if (timeout == -1 || it < timeout)
 				timeout = it;
 		}
 		struct epoll_event events[MAX_EVENTS];
+		dbg("Epoll wait with %d ms timeout\n", timeout);
 		int events_read = epoll_wait(poller, events, MAX_EVENTS, timeout);
 		update_now();
 		dbg("Epoll tick\n");
