@@ -1,7 +1,16 @@
 #include "automaton.h"
 #include "proto_const.h"
+#include "util.h"
 
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+// TODO: Load from configuration
+#define IMAGE_PATH "/home/vorner/g2_cpe-vdsl-ok.bin"
 
 enum action {
 	AC_ENTER,
@@ -19,8 +28,6 @@ struct node_def {
 };
 
 static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, 0x0f /* The PM value (just something that is available even without the image) */ };
-// TODO: This needs to be computed, the file size is variable, once we have some kind of configuration.
-static const uint8_t ask_want_image[] = { CMD_OFFER_IMAGE /* Offer a file */, 0x00 /* File index (what is that?) */, 0x00, 0x1D, 0x2E, 0xC9 /* File size */, 0x00 /* File is firmware */ };
 
 struct param_answer {
 	uint8_t cmd;
@@ -72,6 +79,36 @@ static const struct transition *check_want_image_answer(struct extra_state *stat
 	}
 }
 
+struct file_offer {
+	uint8_t cmd;
+	uint8_t findex;
+	uint32_t fsize;
+	uint8_t ftype;
+} __attribute__((packed));
+
+static const struct transition *prepare_image_offer(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)state;
+	(void)packet;
+	(void)packet_size;
+	static struct file_offer offer = {
+		.cmd = CMD_OFFER_IMAGE
+	};
+	struct stat st;
+	if (stat(IMAGE_PATH, &st) == -1)
+		die("Couldn't stat %s: %s\n", IMAGE_PATH, strerror(errno));
+	offer.fsize = htonl(st.st_size);
+	static struct transition result = {
+		.timeout = 50,
+		.timeout_mult = 2,
+		.retries = 2,
+		.timeout_set = true,
+		.packet = (uint8_t *)&offer,
+		.packet_size = sizeof offer,
+		.packet_send = true
+	};
+	return &result;
+}
+
 static struct node_def defs[] = {
 	[AS_PRESTART] = {
 		.actions = {
@@ -118,15 +155,7 @@ static struct node_def defs[] = {
 		.actions = {
 			// Send a offer of firmware. If it answers, it wants one. If it doesn't, it is probably already loaded. Just confirm and continue.
 			[AC_ENTER] = {
-				.value = {
-					.timeout = 50,
-					.timeout_mult = 2,
-					.retries = 2,
-					.timeout_set = true,
-					.packet = ask_want_image,
-					.packet_size = sizeof ask_want_image,
-					.packet_send = true
-				}
+				.hook = prepare_image_offer
 			},
 			[AC_TIMEOUT] = {
 				.value = {
