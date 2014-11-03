@@ -5,9 +5,11 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 // TODO: Load from configuration
 #define IMAGE_PATH "/home/vorner/g2_cpe-vdsl-ok.bin"
@@ -25,6 +27,11 @@ struct action_def {
 
 struct node_def {
 	struct action_def actions[3];
+};
+
+struct extra_state {
+	int image_fd;
+	uint32_t image_offset;
 };
 
 static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, 0x0f /* The PM value (just something that is available even without the image) */ };
@@ -71,10 +78,15 @@ static const struct transition *check_want_image_answer(struct extra_state *stat
 		};
 		return &result;
 	} else {
+		struct extra_state *new_state = malloc(sizeof *new_state);
+		if ((new_state->image_fd = open(IMAGE_PATH, O_RDONLY)) == -1)
+			die("Couldn't open %s: %s\n", IMAGE_PATH, strerror(errno));
+		new_state->image_offset = 0;
 		static struct transition result = {
 			.new_state = AS_SEND_FIRMWARE,
 			.state_change = true
 		};
+		result.extra_state = new_state;
 		return &result;
 	}
 }
@@ -107,6 +119,69 @@ static const struct transition *prepare_image_offer(struct extra_state *state, c
 		.packet_send = true
 	};
 	return &result;
+}
+
+struct image_part {
+	uint8_t cmd;
+	uint32_t offset;
+	uint32_t size;
+	uint8_t data[MAX_DATA_PAYLOAD];
+} __attribute__((packed));
+
+static const struct transition *send_image_part(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)packet;
+	(void)packet_size;
+	assert(state);
+	assert(state->image_fd != -1);
+	if (lseek(state->image_fd, state->image_offset, SEEK_SET) == (off_t)-1)
+		die("Couldn't seek in firmware image %s to location %zd: %s\n", IMAGE_PATH, (ssize_t)state->image_offset, strerror(errno));
+	static struct image_part part = {
+		.cmd = CMD_IMG_DATA
+	};
+	ssize_t amount = read(state->image_fd, part.data, sizeof part.data);
+	if (amount == -1)
+		die("Couldn't read data from firmware image %s at location %zd: %s\n", IMAGE_PATH, (ssize_t)state->image_offset, strerror(errno));
+	part.offset = htonl(state->image_offset);
+	part.size = htonl(amount);
+	static struct transition result = {
+		.timeout = 50,
+		.timeout_mult = 2,
+		.retries = 2,
+		.timeout_set = true,
+		.packet = (uint8_t *)&part,
+		.packet_send = true
+	};
+	// Don't send the empty data at the end
+	result.packet_size = sizeof part + amount - MAX_DATA_PAYLOAD;
+	result.extra_state = state;
+	return &result;
+}
+
+static const struct transition *check_image_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+	const struct img_ack *ack = packet;
+	if (packet_size < sizeof *ack) // Too short to be the right kind of packet
+		return NULL;
+	if (ack->cmd != CMD_IMG_ACK) // Wrong type of packet
+		return NULL;
+	uint32_t status = ntohl(ack->status);
+	if (status <= IMG_MAX_ACK) {
+		// Acked a packet, move to the next one
+		state->image_offset = status;
+		static struct transition result = {
+			.new_state = AS_SEND_FIRMWARE,
+			.state_change = true
+		};
+		result.extra_state = state;
+		return &result;
+	} else {
+		static struct transition result = {
+			.state_change = true
+			// Don't set the state - it'll be automatically destroyed by action()
+		};
+		// If it is successful, proceed to confirming it talks and has the correct version. Otherwise, try offering the image again, maybe it'll work this time
+		result.new_state = (status == IMG_COMPLETE) ? AS_ASKED_VERSION : AS_ASKED_WANT_IMAGE;
+		return &result;
+	}
 }
 
 static struct node_def defs[] = {
@@ -168,6 +243,23 @@ static struct node_def defs[] = {
 			}
 		}
 	},
+	[AS_SEND_FIRMWARE] = {
+		.actions = {
+			[AC_ENTER] = {
+				.hook = send_image_part
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					// Timed out sending data. So retry from the start, asking if it is still there.
+					.new_state = AS_ASKED_PRESENT,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_image_ack
+			}
+		}
+	},
 	[AS_DEAD] = {
 		.actions = {
 			[AC_ENTER] = {
@@ -202,5 +294,10 @@ const struct transition *state_packet(enum autom_state state, struct extra_state
 }
 
 void extra_state_destroy(struct extra_state *state) {
-	// TODO
+	if (state) {
+		if (state->image_fd != -1)
+			if (close(state->image_fd) == -1)
+				die("Couldn't close FD %d: %s\n", state->image_fd, strerror(errno));
+		free(state);
+	}
 }
