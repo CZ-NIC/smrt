@@ -10,6 +10,12 @@ enum autom_state {
 	AS_PRESTART,
 	// We asked if the modem is there
 	AS_ASKED_PRESENT,
+	// We asked if there's an image loaded
+	AS_ASKED_WANT_IMAGE,
+	// We are sending the image now
+	AS_SEND_FIRMWARE,
+	// Confirm the thing is alive and if the version is OK
+	AS_ASKED_VERSION,
 	// Not there or not responding, after fatal heart attack, whatever.
 	AS_DEAD
 };
