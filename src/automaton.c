@@ -26,6 +26,15 @@ struct action_def {
 	struct transition value;
 };
 
+static const struct transition *hook_ignore(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)state;
+	(void)packet;
+	(void)packet_size;
+	return NULL;
+}
+
+#define ACTION_IGNORE { .hook = hook_ignore }
+
 struct node_def {
 	struct action_def actions[3];
 };
@@ -38,6 +47,7 @@ struct extra_state {
 static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, PARAM_PM /* The PM value (just something that is available even without the image) */ };
 static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x02, 0x00, 0x00, 0x00, PARAM_VERSION };
 static const uint8_t enable_link[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00, PARAM_LINK, 0x01 };
+static const uint8_t ask_state[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, PARAM_STATUS };
 
 static struct transition reset_transition = {
 	.new_state = AS_RESET,
@@ -243,6 +253,41 @@ static const struct transition *check_link_ack(struct extra_state *state, const 
 	}
 }
 
+struct state {
+	uint8_t cmd;
+	uint16_t len;
+	uint16_t seq;
+	uint32_t param;
+	uint16_t modulation;
+	uint8_t state;
+	// There are other items, but we're not interested in them. So we may as well ignore them.
+} __attribute__((packed));
+
+static const struct transition *check_state(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)state;
+	const struct state *st = packet;
+	if (packet_size < sizeof *st)
+		return NULL;
+	if (st->cmd != CMD_ANSWER_PARAM || ntohs(st->seq) != 4 || ntohl(st->param) != PARAM_STATUS)
+		return NULL;
+	// If it is in up state, then everything is nice
+	if (st->state == STATE_OK) {
+		static struct transition result = {
+			.new_state = AS_WATCH,
+			.state_change = true
+		};
+		return &result;
+	} else {
+		/*
+		 * Otherwise, it's some bad state (some that shoundn't be kept forever,
+		 * like training or handshaking - that should last for a short time).
+		 *
+		 * We ignore this packet and wait for one with a better state or time out.
+		 */
+		return NULL;
+	}
+}
+
 static struct node_def defs[] = {
 	[AS_PRESTART] = {
 		.actions = {
@@ -257,7 +302,8 @@ static struct node_def defs[] = {
 					.new_state = AS_ASKED_PRESENT,
 					.state_change = true
 				}
-			}
+			},
+			[AC_PACKET] = ACTION_IGNORE
 		}
 	},
 	[AS_ASKED_PRESENT] = {
@@ -367,7 +413,8 @@ static struct node_def defs[] = {
 					.new_state = AS_ENABLE_LINK,
 					.state_change = true
 				}
-			}
+			},
+			[AC_PACKET] = ACTION_IGNORE
 		}
 	},
 	[AS_ENABLE_LINK] = {
@@ -398,7 +445,43 @@ static struct node_def defs[] = {
 	[AS_WATCH] = {
 		.actions = {
 			[AC_ENTER] = {
-				.hook = NULL // Just because we can't have empty initializer braces
+				.value = {
+					.timeout = 60 * 1000, // Ask for alive-status every minute
+					.timeout_set = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					.new_state = AS_CONFIRM_WORKING,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = ACTION_IGNORE
+		}
+	},
+	[AS_CONFIRM_WORKING] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					// Ask every quarter of minute, up to 5 minutes
+					.timeout = 15 * 1000,
+					.timeout_mult = 1,
+					.retries = 19,
+					.timeout_set = true,
+					.packet = ask_state,
+					.packet_size = sizeof ask_state,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					// If it doesn't work for 5 minutes, try resetting it completely
+					.new_state = AS_RESET,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_state
 			}
 		}
 	},

@@ -10,12 +10,15 @@
 #define CMD_PARAM_ACK 8
 
 #define PARAM_PM 0x0F
+#define PARAM_STATUS 0x10
 #define PARAM_LINK 0x1D
 #define PARAM_VERSION 0x20
 
 #define IMG_PROCEED 0xFFFFFFFF
 #define IMG_COMPLETE 0xFFFFFFF9
 #define IMG_MAX_ACK 0xFFFFFF00
+
+#define STATE_OK 3
 
 // This fits into the ethernet MTU (1500) and is number divisible by 4 (it doesn't work otherwise and freezes).
 #define MAX_DATA_PAYLOAD 1488

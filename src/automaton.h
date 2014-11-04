@@ -24,6 +24,8 @@ enum autom_state {
 	AS_ENABLE_LINK,
 	// Watch it is still operating
 	AS_WATCH,
+	// Query status and decide if everything is OK
+	AS_CONFIRM_WORKING,
 	// Send a reset command
 	AS_RESET,
 	// Not there or not responding, after fatal heart attack, whatever.
