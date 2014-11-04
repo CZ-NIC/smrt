@@ -18,6 +18,12 @@ enum autom_state {
 	AS_ASKED_VERSION,
 	// Send the config
 	AS_SEND_CONFIG,
+	// Wait for config to be swallowed (it answers it enables the link, but does nothing at all)
+	AS_WAIT_CONFIG,
+	// Enable the link
+	AS_ENABLE_LINK,
+	// Watch it is still operating
+	AS_WATCH,
 	// Send a reset command
 	AS_RESET,
 	// Not there or not responding, after fatal heart attack, whatever.

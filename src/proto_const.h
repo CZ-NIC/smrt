@@ -6,8 +6,11 @@
 #define CMD_IMG_ACK 3
 #define CMD_GET_PARAM 5
 #define CMD_ANSWER_PARAM 6
+#define CMD_SET_PARAM 7
+#define CMD_PARAM_ACK 8
 
-#define PARAM_PM 0x0f
+#define PARAM_PM 0x0F
+#define PARAM_LINK 0x1D
 #define PARAM_VERSION 0x20
 
 #define IMG_PROCEED 0xFFFFFFFF

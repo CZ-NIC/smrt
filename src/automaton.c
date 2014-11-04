@@ -35,8 +35,14 @@ struct extra_state {
 	uint32_t image_offset;
 };
 
-static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, 0x0f /* The PM value (just something that is available even without the image) */ };
-static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20 };
+static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, PARAM_PM /* The PM value (just something that is available even without the image) */ };
+static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x02, 0x00, 0x00, 0x00, PARAM_VERSION };
+static const uint8_t enable_link[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00, PARAM_LINK, 0x01 };
+
+static struct transition reset_transition = {
+	.new_state = AS_RESET,
+	.state_change = true
+};
 
 struct param_answer {
 	uint8_t cmd;
@@ -74,11 +80,7 @@ static const struct transition *check_want_image_answer(struct extra_state *stat
 		return NULL;
 	if (ntohl(ack->status) != IMG_PROCEED) {
 		// There was an error. But it shouldn't refuse to upload an image (it may ignore the offer), try reseting it and start again once more.
-		static struct transition result = {
-			.new_state = AS_RESET,
-			.state_change = true
-		};
-		return &result;
+		return &reset_transition;
 	} else {
 		struct extra_state *new_state = malloc(sizeof *new_state);
 		if ((new_state->image_fd = open(IMAGE_PATH, O_RDONLY)) == -1)
@@ -204,15 +206,37 @@ static const struct transition *check_version(struct extra_state *state, const v
 		return NULL; // Wrong packet
 	if (strcmp(version->fw, FW_VERSION) != 0) {
 		// Wrong version if image, reset it and load a new one
-		static struct transition result = {
-			.new_state = AS_RESET,
-			.state_change = true
-		};
-		return &result;
+		return &reset_transition;
 	} else {
 		// All is OK, proceed to setting config
 		static struct transition result = {
 			.new_state = AS_SEND_CONFIG,
+			.state_change = true
+		};
+		return &result;
+	}
+}
+
+struct param_ack {
+	uint8_t cmd;
+	uint16_t len;
+	uint16_t seq;
+	uint8_t error;
+} __attribute__((packed));
+
+static const struct transition *check_link_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)state;
+	const struct param_ack *ack = packet;
+	if (packet_size < sizeof *ack)
+		return NULL;
+	if (ack->cmd != CMD_PARAM_ACK || ntohs(ack->seq) != 3)
+		return NULL;
+	if (ack->error) {
+		// It refused to turn on the link. Therefore we try restarting the whole thing.
+		return &reset_transition;
+	} else {
+		static struct transition result = {
+			.new_state = AS_WATCH, // It is brought up, we just want to check from time to time it is still operational
 			.state_change = true
 		};
 		return &result;
@@ -300,8 +324,8 @@ static struct node_def defs[] = {
 			[AC_ENTER] = {
 				.value = {
 					.timeout = 100,
-					.timeout_mult = 4,
-					.retries = 2,
+					.timeout_mult = 2,
+					.retries = 4,
 					.timeout_set = true,
 					.packet = ask_version,
 					.packet_size = sizeof ask_version,
@@ -316,6 +340,65 @@ static struct node_def defs[] = {
 			},
 			[AC_PACKET] = {
 				.hook = check_version
+			}
+		}
+	},
+	[AS_SEND_CONFIG] = {
+		.actions = {
+			[AC_ENTER] = {
+				// This one is empty for now. Once we have ADSL, it'll do something.
+				.value = {
+					.new_state = AS_WAIT_CONFIG,
+					.state_change = true
+				}
+			}
+		}
+	},
+	[AS_WAIT_CONFIG] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 100,
+					.timeout_set = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					.new_state = AS_ENABLE_LINK,
+					.state_change = true
+				}
+			}
+		}
+	},
+	[AS_ENABLE_LINK] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 50,
+					.timeout_mult = 2,
+					.retries = 2,
+					.timeout_set = true,
+					.packet = enable_link,
+					.packet_size = sizeof enable_link,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					// If we can't turn it on, ask it once again if it is alive by asking for its version
+					.new_state = AS_ASKED_VERSION,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_link_ack
+			}
+		}
+	},
+	[AS_WATCH] = {
+		.actions = {
+			[AC_ENTER] = {
+				.hook = NULL // Just because we can't have empty initializer braces
 			}
 		}
 	},
