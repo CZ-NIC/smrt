@@ -48,6 +48,7 @@ static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 
 static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x02, 0x00, 0x00, 0x00, PARAM_VERSION };
 static const uint8_t enable_link[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00, PARAM_LINK, 0x01 };
 static const uint8_t ask_state[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, PARAM_STATUS };
+static const uint8_t cmd_reset[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x05, 0x00, 0x00, 0x00, PARAM_RESET, 0x01 };
 
 static struct transition reset_transition = {
 	.new_state = AS_RESET,
@@ -474,8 +475,8 @@ static struct node_def defs[] = {
 				}
 			},
 			[AC_TIMEOUT] = {
+				// If it doesn't work for 5 minutes, try resetting it completely
 				.value = {
-					// If it doesn't work for 5 minutes, try resetting it completely
 					.new_state = AS_RESET,
 					.state_change = true
 				}
@@ -483,6 +484,33 @@ static struct node_def defs[] = {
 			[AC_PACKET] = {
 				.hook = check_state
 			}
+		}
+	},
+	[AS_RESET] = {
+		.actions = {
+			/*
+			 * Send two requests to reset, 20ms from each other (for the case one gets lost).
+			 * Then just go to the initial state, don't expect answer from the modem whet
+			 * it's being reset.
+			 */
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 20,
+					.timeout_add = -20,
+					.retries = 1,
+					.timeout_set = true,
+					.packet = cmd_reset,
+					.packet_size = sizeof cmd_reset,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					.new_state = AS_PRESTART,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = ACTION_IGNORE
 		}
 	},
 	[AS_DEAD] = {

@@ -9,6 +9,7 @@
 #define CMD_SET_PARAM 7
 #define CMD_PARAM_ACK 8
 
+#define PARAM_RESET 0x00
 #define PARAM_PM 0x0F
 #define PARAM_STATUS 0x10
 #define PARAM_LINK 0x1D
