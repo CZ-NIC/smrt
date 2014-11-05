@@ -6,4 +6,5 @@ smrtd_MODULES := \
 	netstate \
 	link \
 	interface \
-	automaton
+	automaton \
+	configuration

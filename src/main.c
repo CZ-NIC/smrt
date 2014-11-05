@@ -2,6 +2,7 @@
 #include "link.h"
 #include "util.h"
 #include "interface.h"
+#include "configuration.h"
 
 #include <errno.h>
 #include <string.h>
@@ -96,7 +97,7 @@ static void update_now(void) {
 // We don't care about performance. But multiple events might mean trouble like releasing something and then using it from another event.
 #define MAX_EVENTS 1
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char *argv[]) {
 	// Initialize epoll
 	poller = epoll_create(42 /* Man mandates this to be positive but otherwise without meaning */);
 	if (poller == -1)
@@ -116,8 +117,7 @@ int main(int argc, const char *argv[]) {
 	// Initialize the netstate (after the netlink, so we don't miss any event
 	netstate_init();
 	netstate_set_hooks(up, down);
-	// TODO: This should be read from configuration
-	netstate_add("eth0");
+	configure(argc, argv);
 	netstate_update();
 
 	// Run the loop. Forever.
