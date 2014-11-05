@@ -18,4 +18,7 @@ const struct conn_mapping *iface_conns(const char *iface);
 // Read the configuration passed on command line and set up everything
 void configure(int argc, char *argv[]);
 
+extern const char *image_path;
+extern const char *fw_version;
+
 #endif

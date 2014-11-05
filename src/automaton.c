@@ -1,6 +1,7 @@
 #include "automaton.h"
 #include "proto_const.h"
 #include "util.h"
+#include "configuration.h"
 
 #include <arpa/inet.h>
 #include <sys/types.h>
@@ -10,10 +11,6 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
-
-// TODO: Load from configuration
-#define IMAGE_PATH "/home/vorner/g2_cpe-vdsl-ok.bin"
-#define FW_VERSION "1.03.15"
 
 enum action {
 	AC_ENTER,
@@ -94,8 +91,8 @@ static const struct transition *check_want_image_answer(struct extra_state *stat
 		return &reset_transition;
 	} else {
 		struct extra_state *new_state = malloc(sizeof *new_state);
-		if ((new_state->image_fd = open(IMAGE_PATH, O_RDONLY)) == -1)
-			die("Couldn't open %s: %s\n", IMAGE_PATH, strerror(errno));
+		if ((new_state->image_fd = open(image_path, O_RDONLY)) == -1)
+			die("Couldn't open %s: %s\n", image_path, strerror(errno));
 		new_state->image_offset = 0;
 		static struct transition result = {
 			.new_state = AS_SEND_FIRMWARE,
@@ -121,8 +118,8 @@ static const struct transition *prepare_image_offer(struct extra_state *state, c
 		.cmd = CMD_OFFER_IMAGE
 	};
 	struct stat st;
-	if (stat(IMAGE_PATH, &st) == -1)
-		die("Couldn't stat %s: %s\n", IMAGE_PATH, strerror(errno));
+	if (stat(image_path, &st) == -1)
+		die("Couldn't stat %s: %s\n", image_path, strerror(errno));
 	offer.fsize = htonl(st.st_size);
 	static struct transition result = {
 		.timeout = 50,
@@ -149,13 +146,13 @@ static const struct transition *send_image_part(struct extra_state *state, const
 	assert(state);
 	assert(state->image_fd != -1);
 	if (lseek(state->image_fd, state->image_offset, SEEK_SET) == (off_t)-1)
-		die("Couldn't seek in firmware image %s to location %zd: %s\n", IMAGE_PATH, (ssize_t)state->image_offset, strerror(errno));
+		die("Couldn't seek in firmware image %s to location %zd: %s\n", image_path, (ssize_t)state->image_offset, strerror(errno));
 	static struct image_part part = {
 		.cmd = CMD_IMG_DATA
 	};
 	ssize_t amount = read(state->image_fd, part.data, sizeof part.data);
 	if (amount == -1)
-		die("Couldn't read data from firmware image %s at location %zd: %s\n", IMAGE_PATH, (ssize_t)state->image_offset, strerror(errno));
+		die("Couldn't read data from firmware image %s at location %zd: %s\n", image_path, (ssize_t)state->image_offset, strerror(errno));
 	part.offset = htonl(state->image_offset);
 	part.size = htonl(amount);
 	static struct transition result = {
@@ -215,7 +212,7 @@ static const struct transition *check_version(struct extra_state *state, const v
 		return NULL; // Too short a packet
 	if (version->cmd != CMD_ANSWER_PARAM || ntohl(version->param) != PARAM_VERSION)
 		return NULL; // Wrong packet
-	if (strcmp(version->fw, FW_VERSION) != 0) {
+	if (strcmp(version->fw, fw_version) != 0) {
 		// Wrong version if image, reset it and load a new one
 		return &reset_transition;
 	} else {
