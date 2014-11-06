@@ -50,6 +50,7 @@ struct interface_state *interface_alloc(const char *name, int *fd) {
 	struct ifreq req;
 	memset(&req, 0, sizeof req);
 	strncpy(req.ifr_name, name, IFNAMSIZ);
+	req.ifr_name[IFNAMSIZ - 1] = '\0'; // strncpy doesn't set the terminating '\0' if it doesn't fit
 	if (ioctl(sock, SIOCGIFINDEX, &req) == -1)
 		die("Couldn't get interface index for %s: %s\n", name, strerror(errno));
 	dbg("Interface %s is on index %d\n", name, req.ifr_ifindex);

@@ -39,6 +39,7 @@ void netstate_add(const char *name) {
 		.name = strdup(name)
 	};
 	strncpy(interfaces[interface_count - 1].ifreq.ifr_name, name, IFNAMSIZ);
+	interfaces[interface_count - 1].ifreq.ifr_name[IFNAMSIZ - 1] = '\0'; // strncpy may omit the '\0' if the name doesn't fit
 }
 
 static void iflink(size_t i, bool up) {
