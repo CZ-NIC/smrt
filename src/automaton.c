@@ -19,11 +19,12 @@ enum action {
 };
 
 struct action_def {
-	const struct transition *(*hook)(struct extra_state *state, const void *packet, size_t packet_size);
+	const struct transition *(*hook)(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size);
 	struct transition value;
 };
 
-static const struct transition *hook_ignore(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *hook_ignore(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)state;
 	(void)packet;
 	(void)packet_size;
@@ -40,6 +41,7 @@ struct node_def {
 struct extra_state {
 	int image_fd;
 	uint32_t image_offset;
+	size_t conn_index;
 };
 
 static const uint8_t ask_present_pkt[] = { CMD_GET_PARAM /* Get value */, 0x00, 0x04 /* 4 bytes of value name */, 0x00, 0x01 /* Seq */, 0x00, 0x00, 0x00, PARAM_PM /* The PM value (just something that is available even without the image) */ };
@@ -63,7 +65,8 @@ struct param_answer {
 	uint8_t data[];
 } __attribute__((packed));
 
-static const struct transition *check_presence_answer(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *check_presence_answer(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)state;
 	const struct param_answer *answer = packet;
 	if (packet_size < sizeof *answer)
@@ -82,7 +85,8 @@ struct img_ack {
 	uint32_t status;
 } __attribute__((packed));
 
-static const struct transition *check_want_image_answer(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *check_want_image_answer(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)state;
 	const struct img_ack *ack = packet;
 	if (packet_size < sizeof *ack) // Too short to be the right kind of packet
@@ -113,7 +117,8 @@ struct file_offer {
 	uint8_t ftype;
 } __attribute__((packed));
 
-static const struct transition *prepare_image_offer(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *prepare_image_offer(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)state;
 	(void)packet;
 	(void)packet_size;
@@ -143,7 +148,8 @@ struct image_part {
 	uint8_t data[MAX_DATA_PAYLOAD];
 } __attribute__((packed));
 
-static const struct transition *send_image_part(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *send_image_part(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)packet;
 	(void)packet_size;
 	assert(state);
@@ -172,7 +178,8 @@ static const struct transition *send_image_part(struct extra_state *state, const
 	return &result;
 }
 
-static const struct transition *check_image_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *check_image_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	const struct img_ack *ack = packet;
 	if (packet_size < sizeof *ack) // Too short to be the right kind of packet
 		return NULL;
@@ -208,7 +215,8 @@ struct version {
 	char dsp[20];
 } __attribute__((packed));
 
-static const struct transition *check_version(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *check_version(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	(void)state;
 	const struct version *version = packet;
 	if (packet_size < sizeof *version)
@@ -235,8 +243,8 @@ struct param_ack {
 	uint8_t error;
 } __attribute__((packed));
 
-static const struct transition *check_ack(struct extra_state *state, const void *packet, size_t packet_size, uint16_t seq, enum autom_state new_state) {
-	(void)state;
+static const struct transition *check_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size, uint16_t seq, enum autom_state new_state) {
+	(void)ifname;
 	const struct param_ack *ack = packet;
 	if (packet_size < sizeof *ack)
 		return NULL;
@@ -250,16 +258,17 @@ static const struct transition *check_ack(struct extra_state *state, const void 
 			.state_change = true
 		};
 		result.new_state = new_state;
+		result.extra_state = state;
 		return &result;
 	}
 }
 
-static const struct transition *check_link_ack(struct extra_state *state, const void *packet, size_t packet_size) {
-	return check_ack(state, packet, packet_size, 3, AS_WATCH);
+static const struct transition *check_link_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	return check_ack(ifname, state, packet, packet_size, 3, AS_WATCH);
 }
 
-static const struct transition *check_mode_ack(struct extra_state *state, const void *packet, size_t packet_size) {
-	return check_ack(state, packet, packet_size, 6, AS_WAIT_CONFIG);
+static const struct transition *check_mode_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	return check_ack(ifname, state, packet, packet_size, 6, AS_SEND_CONFIG_CONN);
 }
 
 struct state {
@@ -272,8 +281,8 @@ struct state {
 	// There are other items, but we're not interested in them. So we may as well ignore them.
 } __attribute__((packed));
 
-static const struct transition *check_state(struct extra_state *state, const void *packet, size_t packet_size) {
-	(void)state;
+static const struct transition *check_state(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)ifname;
 	const struct state *st = packet;
 	if (packet_size < sizeof *st)
 		return NULL;
@@ -285,6 +294,7 @@ static const struct transition *check_state(struct extra_state *state, const voi
 			.new_state = AS_WATCH,
 			.state_change = true
 		};
+		result.extra_state= state;
 		return &result;
 	} else {
 		/*
@@ -295,6 +305,84 @@ static const struct transition *check_state(struct extra_state *state, const voi
 		 */
 		return NULL;
 	}
+}
+
+struct conn_params {
+	uint8_t command;
+	uint16_t len;
+	uint16_t seq;
+	uint32_t param;
+	uint8_t enable;
+	uint8_t l2mode;
+	uint8_t traffic_type;
+	uint8_t encap_mode;
+	uint8_t qos;
+	uint32_t pcr;
+	uint32_t scr;
+	uint32_t mbs;
+	uint32_t mcr;
+	uint16_t vpi;
+	uint16_t vci;
+	uint16_t vlan;
+	uint8_t vlan_flag;
+} __attribute__((packed));
+
+static const struct transition *send_conn(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	(void)packet;
+	(void)packet_size;
+	if (!state) {
+		state = malloc(sizeof *state);
+		*state = (struct extra_state) {
+			.image_fd = -1
+		};
+	}
+	const struct conn_mapping *conns = iface_conns(ifname);
+	assert(conns);
+	static struct conn_params params;
+	params = (struct conn_params) {
+		.command = CMD_SET_PARAM,
+		.len = htons(sizeof params - 5),
+		.seq = htons(7 + state->conn_index),
+		.param = htonl(PARAM_CONN + state->conn_index),
+		.enable = conns[state->conn_index].active,
+		.l2mode = L2_ATM,
+		.traffic_type = TRAFFIC_EOA,
+		.encap_mode = ENCAP_LLC,
+		.qos = QOS_DISABLE,
+		// TODO PCR?
+		// TODO SCR?
+		// TODO MBS?
+		// TODO MCR?
+		.vpi = htons(conns[state->conn_index].vpi),
+		.vci = htons(conns[state->conn_index].vci),
+		.vlan = htons(conns[state->conn_index].vlan),
+		.vlan_flag = 0
+	};
+	static struct transition result = {
+		.timeout = 200, // This operation seems to be really slow, so give it time
+		.timeout_mult = 2,
+		.retries = 2,
+		.timeout_set = true,
+		.packet = (void *)&params,
+		.packet_size = sizeof params,
+		.packet_send = true
+	};
+	result.extra_state = state;
+	return &result;
+}
+
+static const struct transition *check_conn_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	assert(state);
+	const struct transition *result = check_ack(ifname, state, packet, packet_size, 7 + state->conn_index, AS_SEND_CONFIG_CONN);
+	state->conn_index ++;
+	if (result && state->conn_index == MAX_CONN_CNT) {
+		static struct transition next = {
+			.new_state = AS_WAIT_CONFIG,
+			.state_change = true
+		};
+		return &next;
+	}
+	return result;
 }
 
 static struct node_def defs[] = {
@@ -419,6 +507,17 @@ static struct node_def defs[] = {
 			}
 		}
 	},
+	[AS_SEND_CONFIG_CONN] = {
+		.actions = {
+			[AC_ENTER] = {
+				.hook = send_conn
+			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
+			[AC_PACKET] = {
+				.hook = check_conn_ack
+			}
+		}
+	},
 	[AS_WAIT_CONFIG] = {
 		.actions = {
 			[AC_ENTER] = {
@@ -540,11 +639,11 @@ static struct node_def defs[] = {
 	}
 };
 
-static const struct transition *action(enum autom_state state, enum action action, struct extra_state *extra_state, const void *packet, size_t packet_size) {
+static const struct transition *action(const char *ifname, enum autom_state state, enum action action, struct extra_state *extra_state, const void *packet, size_t packet_size) {
 	struct action_def *ad = &defs[state].actions[action];
 	const struct transition *result;
 	if (ad->hook)
-		result = ad->hook(extra_state, packet, packet_size);
+		result = ad->hook(ifname, extra_state, packet, packet_size);
 	else
 		result = &ad->value;
 	if (result && result->extra_state != extra_state)
@@ -552,16 +651,16 @@ static const struct transition *action(enum autom_state state, enum action actio
 	return result;
 }
 
-const struct transition *state_enter(enum autom_state state, struct extra_state *extra_state) {
-	return action(state, AC_ENTER, extra_state, NULL, 0);
+const struct transition *state_enter(const char *ifname, enum autom_state state, struct extra_state *extra_state) {
+	return action(ifname, state, AC_ENTER, extra_state, NULL, 0);
 }
 
-const struct transition *state_timeout(enum autom_state state, struct extra_state *extra_state) {
-	return action(state, AC_TIMEOUT, extra_state, NULL, 0);
+const struct transition *state_timeout(const char *ifname, enum autom_state state, struct extra_state *extra_state) {
+	return action(ifname, state, AC_TIMEOUT, extra_state, NULL, 0);
 }
 
-const struct transition *state_packet(enum autom_state state, struct extra_state *extra_state, const void *packet, size_t packet_size) {
-	return action(state, AC_PACKET, extra_state, packet, packet_size);
+const struct transition *state_packet(const char *ifname, enum autom_state state, struct extra_state *extra_state, const void *packet, size_t packet_size) {
+	return action(ifname, state, AC_PACKET, extra_state, packet, packet_size);
 }
 
 void extra_state_destroy(struct extra_state *state) {

@@ -52,9 +52,9 @@ struct transition {
 	const uint8_t *packet;
 };
 
-const struct transition *state_enter(enum autom_state state, struct extra_state *extra_state);
-const struct transition *state_timeout(enum autom_state state, struct extra_state *extra_state);
-const struct transition *state_packet(enum autom_state, struct extra_state *extra_state, const void *packet, size_t packet_size);
+const struct transition *state_enter(const char *iface, enum autom_state state, struct extra_state *extra_state);
+const struct transition *state_timeout(const char *iface, enum autom_state state, struct extra_state *extra_state);
+const struct transition *state_packet(const char *iface, enum autom_state, struct extra_state *extra_state, const void *packet, size_t packet_size);
 void extra_state_destroy(struct extra_state *state);
 
 #endif

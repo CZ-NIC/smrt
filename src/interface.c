@@ -23,6 +23,7 @@ const uint8_t dest_mac[] = DEST_MAC;
 #define RECV_PACKET_LEN 4096
 
 struct interface_state {
+	char *ifname;
 	int fd;
 	enum autom_state autom_state;
 	bool timeout_active;
@@ -67,6 +68,7 @@ struct interface_state *interface_alloc(const char *name, int *fd) {
 	*fd = sock;
 	struct interface_state *result = malloc(sizeof *result);
 	*result = (struct interface_state) {
+		.ifname = strdup(name),
 		.fd = sock,
 		.autom_state = AS_PRESTART,
 		.timeout_active = true,
@@ -80,6 +82,7 @@ void interface_release(struct interface_state *interface) {
 	if (close(interface->fd) == -1)
 		die("Couldn't close interface's communication socket %d: %s\n", interface->fd, strerror(errno));
 	extra_state_destroy(interface->extra_state);
+	free(interface->ifname);
 	free(interface->packet);
 	free(interface);
 }
@@ -155,7 +158,7 @@ static void transition_perform(struct interface_state *interface, uint64_t now, 
 	if (transition->state_change) {
 		dbg("Changing state to %u\n", (unsigned)transition->new_state);
 		interface->autom_state = transition->new_state;
-		transition_perform(interface, now, state_enter(interface->autom_state, interface->extra_state)); // Also enter the new state
+		transition_perform(interface, now, state_enter(interface->ifname, interface->autom_state, interface->extra_state)); // Also enter the new state
 	}
 }
 
@@ -171,7 +174,7 @@ void interface_tick(struct interface_state *interface, uint64_t now) {
 	} else {
 		dbg("Timed out\n");
 		// OK, we sent all the retries. We really timed out. So enter a new state.
-		transition_perform(interface, now, state_timeout(interface->autom_state, interface->extra_state));
+		transition_perform(interface, now, state_timeout(interface->ifname, interface->autom_state, interface->extra_state));
 	}
 }
 
@@ -192,5 +195,5 @@ void interface_read(struct interface_state *interface, uint64_t now) {
 		return;
 	}
 	dbg("Packet on interface %d fd %d of size %zd\n", interface->ifindex, interface->fd, received);
-	transition_perform(interface, now, state_packet(interface->autom_state, interface->extra_state, p->data, received - sizeof p->hdr));
+	transition_perform(interface, now, state_packet(interface->ifname, interface->autom_state, interface->extra_state, p->data, received - sizeof p->hdr));
 }

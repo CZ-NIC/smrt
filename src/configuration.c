@@ -93,3 +93,10 @@ void configure(int argc, char *argv[]) {
 	if (!fw_version)
 		die("The firmware version not set\n");
 }
+
+const struct conn_mapping *iface_conns(const char *iface) {
+	for (size_t i = 0; i < interface_count; i ++)
+		if (strcmp(interfaces[i].name, iface) == 0)
+			return interfaces[i].mappings;
+	return NULL;
+}

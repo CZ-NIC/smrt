@@ -10,6 +10,8 @@
 #define CMD_PARAM_ACK 8
 
 #define PARAM_RESET 0x00
+#define PARAM_CONN 0x01
+// Now there are 7 more connections
 #define PARAM_MODE 0x0B
 #define PARAM_PM 0x0F
 #define PARAM_STATUS 0x10
@@ -19,6 +21,11 @@
 #define IMG_PROCEED 0xFFFFFFFF
 #define IMG_COMPLETE 0xFFFFFFF9
 #define IMG_MAX_ACK 0xFFFFFF00
+
+#define L2_ATM 1
+#define TRAFFIC_EOA 0
+#define ENCAP_LLC 1
+#define QOS_DISABLE 6
 
 #define STATE_OK 3
 
