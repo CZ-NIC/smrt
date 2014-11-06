@@ -31,6 +31,7 @@ static const struct transition *hook_ignore(struct extra_state *state, const voi
 }
 
 #define ACTION_IGNORE { .hook = hook_ignore }
+#define ACTION_ASK_PRESENT { .value = { .new_state = AS_ASKED_PRESENT, .state_change = true } }
 
 struct node_def {
 	struct action_def actions[3];
@@ -46,6 +47,8 @@ static const uint8_t ask_version[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x02, 0x
 static const uint8_t enable_link[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00, PARAM_LINK, 0x01 };
 static const uint8_t ask_state[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, PARAM_STATUS };
 static const uint8_t cmd_reset[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x05, 0x00, 0x00, 0x00, PARAM_RESET, 0x01 };
+// List allowed modes. This allows them all.
+static const uint8_t set_mode[] = { CMD_SET_PARAM, 0x00, 0x08, 0x00, 0x06, 0x00, 0x00, 0x00, PARAM_MODE, 0x00, 0x3F, 0x00, 0xF3 };
 
 static struct transition reset_transition = {
 	.new_state = AS_RESET,
@@ -218,7 +221,7 @@ static const struct transition *check_version(struct extra_state *state, const v
 	} else {
 		// All is OK, proceed to setting config
 		static struct transition result = {
-			.new_state = AS_SEND_CONFIG,
+			.new_state = AS_WAIT_BEFORE_CONFIG,
 			.state_change = true
 		};
 		return &result;
@@ -232,23 +235,31 @@ struct param_ack {
 	uint8_t error;
 } __attribute__((packed));
 
-static const struct transition *check_link_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+static const struct transition *check_ack(struct extra_state *state, const void *packet, size_t packet_size, uint16_t seq, enum autom_state new_state) {
 	(void)state;
 	const struct param_ack *ack = packet;
 	if (packet_size < sizeof *ack)
 		return NULL;
-	if (ack->cmd != CMD_PARAM_ACK || ntohs(ack->seq) != 3)
+	if (ack->cmd != CMD_PARAM_ACK || ntohs(ack->seq) != seq)
 		return NULL;
 	if (ack->error) {
 		// It refused to turn on the link. Therefore we try restarting the whole thing.
 		return &reset_transition;
 	} else {
 		static struct transition result = {
-			.new_state = AS_WATCH, // It is brought up, we just want to check from time to time it is still operational
 			.state_change = true
 		};
+		result.new_state = new_state;
 		return &result;
 	}
+}
+
+static const struct transition *check_link_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+	return check_ack(state, packet, packet_size, 3, AS_WATCH);
+}
+
+static const struct transition *check_mode_ack(struct extra_state *state, const void *packet, size_t packet_size) {
+	return check_ack(state, packet, packet_size, 6, AS_WAIT_CONFIG);
 }
 
 struct state {
@@ -295,12 +306,7 @@ static struct node_def defs[] = {
 					.timeout_set = true
 				}
 			},
-			[AC_TIMEOUT] = {
-				.value = {
-					.new_state = AS_ASKED_PRESENT,
-					.state_change = true
-				}
-			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
 			[AC_PACKET] = ACTION_IGNORE
 		}
 	},
@@ -351,13 +357,7 @@ static struct node_def defs[] = {
 			[AC_ENTER] = {
 				.hook = send_image_part
 			},
-			[AC_TIMEOUT] = {
-				.value = {
-					// Timed out sending data. So retry from the start, asking if it is still there.
-					.new_state = AS_ASKED_PRESENT,
-					.state_change = true
-				}
-			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
 			[AC_PACKET] = {
 				.hook = check_image_ack
 			}
@@ -376,25 +376,46 @@ static struct node_def defs[] = {
 					.packet_send = true
 				}
 			},
-			[AC_TIMEOUT] = {
-				.value = { // Not answering version. Is it still there?
-					.new_state = AS_ASKED_PRESENT,
-					.state_change = true
-				}
-			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
 			[AC_PACKET] = {
 				.hook = check_version
 			}
 		}
 	},
-	[AS_SEND_CONFIG] = {
+	[AS_WAIT_BEFORE_CONFIG] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 100,
+					.timeout_set = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					.new_state = AS_SEND_CONFIG_MODE,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = ACTION_IGNORE
+		}
+	},
+	[AS_SEND_CONFIG_MODE] = {
 		.actions = {
 			[AC_ENTER] = {
 				// This one is empty for now. Once we have ADSL, it'll do something.
 				.value = {
-					.new_state = AS_WAIT_CONFIG,
-					.state_change = true
+					.timeout = 100,
+					.timeout_mult = 2,
+					.retries = 4,
+					.timeout_set = true,
+					.packet = set_mode,
+					.packet_size = sizeof set_mode,
+					.packet_send = true
 				}
+			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
+			[AC_PACKET] = {
+				.hook = check_mode_ack
 			}
 		}
 	},

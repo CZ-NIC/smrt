@@ -16,8 +16,12 @@ enum autom_state {
 	AS_SEND_FIRMWARE,
 	// Confirm the thing is alive and if the version is OK
 	AS_ASKED_VERSION,
-	// Send the config
-	AS_SEND_CONFIG,
+	// Wait a little bit before feeding it with config
+	AS_WAIT_BEFORE_CONFIG,
+	// Send the config (the modulation mode)
+	AS_SEND_CONFIG_MODE,
+	// Send the config (the connection mappings)
+	AS_SEND_CONFIG_CONN,
 	// Wait for config to be swallowed (it answers it enables the link, but does nothing at all)
 	AS_WAIT_CONFIG,
 	// Enable the link
