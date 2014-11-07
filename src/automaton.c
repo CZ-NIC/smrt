@@ -359,9 +359,9 @@ static const struct transition *send_conn(const char *ifname, struct extra_state
 		.vlan_flag = 0
 	};
 	static struct transition result = {
-		.timeout = 200, // This operation seems to be really slow, so give it time
+		.timeout = 500, // This operation seems to be really slow, so give it time
 		.timeout_mult = 2,
-		.retries = 2,
+		.retries = 3,
 		.timeout_set = true,
 		.packet = (void *)&params,
 		.packet_size = sizeof params,
