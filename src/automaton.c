@@ -264,7 +264,7 @@ static const struct transition *check_ack(const char *ifname, struct extra_state
 }
 
 static const struct transition *check_link_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
-	return check_ack(ifname, state, packet, packet_size, 3, AS_WATCH);
+	return check_ack(ifname, state, packet, packet_size, 3, AS_FIRST_START);
 }
 
 static const struct transition *check_mode_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
@@ -593,6 +593,30 @@ static struct node_def defs[] = {
 			},
 			[AC_TIMEOUT] = {
 				// If it doesn't work for 5 minutes, try resetting it completely
+				.value = {
+					.new_state = AS_RESET,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_state
+			}
+		}
+	},
+	[AS_FIRST_START] = { // Just like AS_CONFIRM_WORKING, but asking more often and for longer time
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 5 * 1000,
+					.timeout_mult = 1,
+					.retries = 59, // Ask for whole 5 minutes
+					.timeout_set = true,
+					.packet = ask_state,
+					.packet_size = sizeof ask_state,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
 				.value = {
 					.new_state = AS_RESET,
 					.state_change = true
