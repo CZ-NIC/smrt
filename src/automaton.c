@@ -294,9 +294,10 @@ static const struct transition *check_state(const char *ifname, struct extra_sta
 			.new_state = AS_WATCH,
 			.state_change = true
 		};
-		result.extra_state= state;
+		result.extra_state = state;
 		return &result;
 	} else {
+		dbg("In state %hhu\n", st->state);
 		/*
 		 * Otherwise, it's some bad state (some that shoundn't be kept forever,
 		 * like training or handshaking - that should last for a short time).
