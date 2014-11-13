@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
 		for (size_t i = 0; i < interface_count; i ++) {
 			int it = interface_timeout(interfaces[i].state, now);
 			assert(it >= -1);
-			if (timeout == -1 || it < timeout)
+			if (timeout == -1 || (it != -1 && it < timeout))
 				timeout = it;
 		}
 		struct epoll_event events[MAX_EVENTS];
