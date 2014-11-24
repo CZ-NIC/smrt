@@ -73,6 +73,7 @@ static const struct transition *check_presence_answer(const char *ifname, struct
 		return NULL; // Message too short
 	if (answer->cmd != CMD_ANSWER_PARAM || ntohs(answer->seq) != 1 || ntohl(answer->type) != PARAM_PM)
 		return NULL;
+	msg("Modem seems to be present\n");
 	static struct transition result = {
 		.new_state = AS_ASKED_WANT_IMAGE,
 		.state_change = true
@@ -101,6 +102,7 @@ static const struct transition *check_want_image_answer(const char *ifname, stru
 		if ((new_state->image_fd = open(image_path, O_RDONLY)) == -1)
 			die("Couldn't open %s: %s\n", image_path, strerror(errno));
 		new_state->image_offset = 0;
+		msg("Sending firmware");
 		static struct transition result = {
 			.new_state = AS_SEND_FIRMWARE,
 			.state_change = true
@@ -295,6 +297,7 @@ static const struct transition *check_state(const char *ifname, struct extra_sta
 			.state_change = true
 		};
 		result.extra_state = state;
+		msg("Modem is running\n");
 		return &result;
 	} else {
 		dbg("In state %hhu\n", st->state);
@@ -369,6 +372,7 @@ static const struct transition *send_conn(const char *ifname, struct extra_state
 		.packet_send = true
 	};
 	result.extra_state = state;
+	msg("Sending config\n");
 	return &result;
 }
 

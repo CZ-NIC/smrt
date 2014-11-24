@@ -44,7 +44,7 @@ void netstate_add(const char *name) {
 
 static void iflink(size_t i, bool up) {
 	if (interfaces[i].up != up) {
-		dbg("Link of interface %s changed to %s\n", interfaces[i].name, up ? "up" : "down");
+		msg("Link of interface %s changed to %s\n", interfaces[i].name, up ? "up" : "down");
 		interfaces[i].up = up;
 		link_hook hook = up ? up_hook : down_hook;
 		if (hook)
@@ -55,7 +55,7 @@ static void iflink(size_t i, bool up) {
 void netstate_update(void) {
 	for (size_t i = 0; i < interface_count; i ++) {
 		if (ioctl(dummy_socket, SIOCGIFFLAGS, &interfaces[i].ifreq) == -1) {
-			dbg("Link %s doesn't exist\n", interfaces[i].name);
+			msg("Link %s doesn't exist\n", interfaces[i].name);
 			iflink(i, false);
 		} else
 			iflink(i, interfaces[i].ifreq.ifr_flags & IFF_RUNNING);

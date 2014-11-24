@@ -3,5 +3,6 @@
 
 void die(const char *message, ...) __attribute__((noreturn)) __attribute__((format(printf, 1, 2)));
 void dbg(const char *message, ...) __attribute__((format(printf, 1, 2)));
+void msg(const char *message, ...) __attribute__((format(printf, 1, 2)));
 
 #endif

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <syslog.h>
 
 struct epoll_tag {
 	void (*hook)(struct epoll_tag *tag);
@@ -98,6 +99,7 @@ static void update_now(void) {
 #define MAX_EVENTS 1
 
 int main(int argc, char *argv[]) {
+	openlog("smrtd", 0, LOG_DAEMON);
 	// Initialize epoll
 	poller = epoll_create(42 /* Man mandates this to be positive but otherwise without meaning */);
 	if (poller == -1)
