@@ -7,6 +7,8 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -145,8 +147,12 @@ int main(int argc, char *argv[]) {
 		}
 		for (int i = 0; i < events_read; i ++) {
 			struct epoll_tag *t = events[i].data.ptr;
-			if (events[i].events & EPOLLERR)
-				die("Error on file descriptor %d/%s\n", t->fd, t->name);
+			if (events[i].events & EPOLLERR) {
+				int error = 0;
+				socklen_t errlen = sizeof error;
+				getsockopt(t->fd, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen);
+				die("Error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(errno));
+			}
 			if (events[i].events & EPOLLIN)
 				t->hook(t);
 		}
