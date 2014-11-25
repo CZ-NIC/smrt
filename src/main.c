@@ -150,8 +150,9 @@ int main(int argc, char *argv[]) {
 			if (events[i].events & EPOLLERR) {
 				int error = 0;
 				socklen_t errlen = sizeof error;
-				getsockopt(t->fd, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen);
-				die("Error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(errno));
+				if (getsockopt(t->fd, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen) == -1)
+					msg("Error getting error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(errno));
+				die("Error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(error));
 			}
 			if (events[i].events & EPOLLIN)
 				t->hook(t);
