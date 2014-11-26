@@ -1,0 +1,79 @@
+SMRTd
+=====
+
+SMRT stands for Small Modem for Router Turris. The modem is quite
+simple device. It has no permanent memory, no web configuration
+interface and no IP address. It just bridges the traffic on the
+telephone line to the ethernet line.
+
+SMRTd is a daemon that watches if there's a modem connected and, if it
+is, feeds it with firmware and configuration and monitors its health.
+
+Channel mappings
+----------------
+
+The ISPs tend to send multiple channels inside the telephone cable.
+This may need some configuration, depending on the encapsulation used.
+
+In one mode, the ISP provides VLANs. In such case, no special
+configuration is needed and the VLANs are passed through to ethernet
+as IEEE 802.1Q.
+
+Another mode provides VCI/VPI for each channel. These need to be
+mapped to VLANs, since it is the only reasonable way to send multiple
+channels on ethernet. The modem allows mapping of up to 8 VCI/VPI
+pairs to VLAN numbers and translates to them.
+
+In case the configuration is provided, but the first mode is used,
+nothing bad happens and the configuration is simply ignored.
+
+Command line
+------------
+
+The daemon doesn't read any configuration files and is configured
+through command line arguments.
+
+`-f`:: This parameter expects one argument and it specifies file
+  containing the firmware for the modem.
+`-v`:: Version string of the firmware. This is used in case the modem
+  already contains firmware to check it is up to date. If it matches,
+  nothing is done. If it differs, modem is reset and new firmware is
+  uploaded. Therefore, the firmware version provided must match the
+  firmware.
+`-i`:: Interface name to watch for the modem. This may be specified
+  multiple times. In such case, all the interfaces are watched for
+  presence of modem. Be aware that the interface needs to be plugged
+  directly into the modem, so link up/down events are detected. Lines
+  connected through switch chip won't work properly.
+`-c`:: Mapping of VCI/VPI onto a VLAN. Three numbers follow, in order:
+  - VLAN number
+  - VCI
+  - VPI
+
++
+It is possible to specify it multiple times per interface. It
+must be preceded by `-i` argument and only the preceding interface is
+configured.
+
+For example, this would watch two interfaces (`eth0` and `eth1`), map
+two channels on the first one and none on the second.
+
+  ./smrtd -f firmware.img -v '1.2.3' -i eth0 -c 24 1 24 -c 33 2 33 -i eth1
+
+To change the configuration, simply restart the daemon. The modem
+doesn't get restarted if it doesn't need to.
+
+Interaction
+-----------
+
+The modem is just a simple bridge. There needs to be other software
+handling the rest.
+
+The modem provides VLANs on its ethernet. Therefore, the correct VLANs
+need to be mapped and unpacked inside the router. It can be done by
+specifying the interface name followed by dot and the VLAN number (eg.
+eth0.13).
+
+Many ISPs don't pass the internet directly through the line, but send
+it encapsulated in PPPoE protocol. In such case the pppd daemon needs
+to be running and configured to send the username and password.

@@ -8,3 +8,5 @@ smrtd_MODULES := \
 	interface \
 	automaton \
 	configuration
+
+DOCS += src/smrtd
