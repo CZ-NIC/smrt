@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
 	dbg("Init done\n");
 	update_now();
 	for (;;) {
+		TICK:;
 		int timeout = -1;
 		for (size_t i = 0; i < interface_count; i ++) {
 			int it = interface_timeout(interfaces[i].state, now);
@@ -152,7 +153,15 @@ int main(int argc, char *argv[]) {
 				socklen_t errlen = sizeof error;
 				if (getsockopt(t->fd, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen) == -1)
 					msg("Error getting error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(errno));
-				die("Error on file descriptor %d/%s: %s\n", t->fd, t->name, strerror(error));
+				if (t->fd == netlink_epoll.fd)
+					die("Error on netlink descriptor %d: %s\n", t->fd, strerror(error));
+				else {
+					msg("Error on interface file descriptor %d/%s: %s, bringing down\n", t->fd, t->name, strerror(error));
+					down(t->name);
+					// Try sniffing the interfaces, the state might be wrong
+					netlink_ready(NULL);
+					goto TICK; // Don't try reading anything more, we may have reconfigured a lot of stuff here
+				}
 			}
 			if (events[i].events & EPOLLIN)
 				t->hook(t);
