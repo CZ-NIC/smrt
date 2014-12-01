@@ -1,6 +1,7 @@
 #include "interface.h"
 #include "util.h"
 #include "automaton.h"
+#include "proto_const.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -13,8 +14,6 @@
 #include <linux/if_ether.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-
-const uint16_t control_protocol = 0x8889;
 
 // The MAC address of the device - this seems ugly, but can't be helped
 #define DEST_MAC {6, 5, 4, 3, 2, 1}
@@ -38,7 +37,7 @@ struct interface_state {
 
 struct interface_state *interface_alloc(const char *name, int *fd) {
 	// We communicate over ethernet frames, so we need to manipulate them on rather low level.
-	int sock = socket(AF_PACKET, SOCK_RAW, htons(control_protocol));
+	int sock = socket(AF_PACKET, SOCK_RAW, htons(CONTROL_PROTOCOL));
 	if (sock == -1)
 		die("Couldn't create AF_PACKET socket: %s\n", strerror(errno));
 	// Get info about the interface (index, MAC address)
@@ -60,7 +59,7 @@ struct interface_state *interface_alloc(const char *name, int *fd) {
 		die("Couldn't get mac address for interface %s: %s\n", name, strerror(errno));
 	struct sockaddr_ll addr = {
 		.sll_family = AF_PACKET,
-		.sll_protocol = htons(control_protocol),
+		.sll_protocol = htons(CONTROL_PROTOCOL),
 		.sll_ifindex = ifindex
 	};
 	if (bind(sock, (struct sockaddr *)&addr, sizeof addr) == -1)
@@ -110,7 +109,7 @@ static void packet_send(struct interface_state *interface) {
 	struct packet_basic *p = alloca(size);
 	p->hdr = (struct ethhdr) {
 		.h_dest = DEST_MAC,
-		.h_proto = htons(control_protocol)
+		.h_proto = htons(CONTROL_PROTOCOL)
 	};
 	memcpy(p->hdr.h_source, interface->mac_addr, ETH_ALEN);
 	memcpy(p->data, interface->packet, interface->packet_size);
@@ -118,7 +117,7 @@ static void packet_send(struct interface_state *interface) {
 	struct sockaddr_ll addr = {
 		.sll_family = AF_PACKET,
 		.sll_ifindex = interface->ifindex,
-		.sll_protocol = htons(control_protocol)
+		.sll_protocol = htons(CONTROL_PROTOCOL)
 	};
 	ssize_t sent = sendto(interface->fd, p, size, MSG_NOSIGNAL, (struct sockaddr *)&addr, sizeof addr);
 	if (sent == -1) {
@@ -190,7 +189,7 @@ void interface_read(struct interface_state *interface, uint64_t now) {
 		die("Packet of size %zd received, but I have space only for %u (interface %d, fd %d)\n", received, (unsigned)RECV_PACKET_LEN, interface->ifindex, interface->fd);
 	dbg("Packet from the modem on interface %d fd %d of size %zd\n", interface->ifindex, interface->fd, received);
 	struct packet_basic *p = (struct packet_basic *)buffer;
-	if (memcmp(p->hdr.h_source, dest_mac, ETH_ALEN) != 0 || memcmp(p->hdr.h_dest, interface->mac_addr, ETH_ALEN) != 0 || p->hdr.h_proto != htons(control_protocol)) {
+	if (memcmp(p->hdr.h_source, dest_mac, ETH_ALEN) != 0 || memcmp(p->hdr.h_dest, interface->mac_addr, ETH_ALEN) != 0 || p->hdr.h_proto != htons(CONTROL_PROTOCOL)) {
 		dbg("Foreign packet received and ignored\n");
 		return;
 	}

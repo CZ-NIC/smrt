@@ -1,6 +1,8 @@
 #ifndef SMRT_PROTO_CONST_H
 #define SMRT_PROTO_CONST_H
 
+#define CONTROL_PROTOCOL 0x8889
+
 #define CMD_OFFER_IMAGE 1
 #define CMD_IMG_DATA 2
 #define CMD_IMG_ACK 3

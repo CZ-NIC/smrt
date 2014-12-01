@@ -1,0 +1,56 @@
+Internals of SMRTd and the protocol
+===================================
+
+The modem uses its own binary protocol over special ethernet frames.
+The ethernet protocol used is 0x8889 and the modem's MAC address is
+always 06:05:04:03:02:01. This is hardcoded in the chip. As a result,
+it is not possible to have multiple modems connected to the same
+ethernet segment.
+
+The daemon watches the given interfaces for link up/down events. In
+case it is brought up, a state automaton is created to keep the state
+of the modem.
+
+The first thing it does is sending a query for current power-management
+settings of the modem. This is used to discover if the modem is
+present. This query was experimentally discovered to be answered even
+without firmware. The content of answer is ignored. In case no answer
+comes after several retries, the daemon decides the modem is not
+present and goes to sleep.
+
+The daemon then sends an offer of firmware. If it has no firmware
+loaded, it accepts the offer and the firmware is sent in multiple
+frames (no flow control is needed, we always wait for ACK before
+sending the next one). If firmware is present, it is refused.
+
+After that, a version is checked. This works as a check for previous
+version of firmware preloaded in the modem. It also checks the modem
+got uploaded correctly. If the version matches, the daemon proceeds
+further. If not, the modem is restarted and the process is started
+from the beginning.
+
+A config is uploaded in the next stage and the modem link is enabled.
+
+The state of the link is checked periodically. If it is not connected
+for a too long time, the modem is reset and the process starts again,
+to recover from both strange phenomena of the Chinese chip and from
+whatever the provider might be doing.
+
+Technologies used inside
+------------------------
+
+There are few technologies of note used inside the daemon. They
+include:
+
+epoll::
+  This is used to watch over multiple file descriptors and timeouts.
+netlink::
+  This is the way how kernel tells the daemon an interface went up or
+  down.
+packet sockets::
+  A packet socket is opened on each interface that is up and is
+  watched for modems. It allows sending and receiving the packets on
+  with protocol 0x8889.
+
+If you want to know the constants of the protocol and its message
+layout, look into the source code.

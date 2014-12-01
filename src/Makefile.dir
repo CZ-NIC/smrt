@@ -9,4 +9,4 @@ smrtd_MODULES := \
 	automaton \
 	configuration
 
-DOCS += src/smrtd
+DOCS += src/smrtd src/internals
