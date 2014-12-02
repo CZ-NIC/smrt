@@ -73,7 +73,7 @@ static void iflink(size_t i, bool up) {
 void netstate_update(void) {
 	for (size_t i = 0; i < interface_count; i ++) {
 		if (ioctl(dummy_socket, SIOCGIFFLAGS, &interfaces[i].ifreq) == -1) {
-			msg("Link %s doesn't exist\n", interfaces[i].name);
+			msg("Link %s doesn't exist: %s\n", interfaces[i].name, strerror(errno));
 			iflink(i, false);
 		} else
 			iflink(i, interfaces[i].ifreq.ifr_flags & IFF_RUNNING);
