@@ -115,6 +115,8 @@ void configure(int argc, char *argv[]) {
 		die("The firmware image not set\n");
 	if (!fw_version)
 		die("The firmware version not set\n");
+	if (!status_path)
+		die("The status path must be set\n");
 }
 
 const struct conn_mapping *iface_conns(const char *iface) {
@@ -122,4 +124,12 @@ const struct conn_mapping *iface_conns(const char *iface) {
 		if (strcmp(interfaces[i].name, iface) == 0)
 			return interfaces[i].mappings;
 	return NULL;
+}
+
+const char *interface_status_path(const char *interface) {
+	static char *path = NULL;
+	free(path);
+	path = malloc(2 + strlen(status_path) + strlen(interface));
+	sprintf(path, "%s/%s", status_path, interface);
+	return path;
 }

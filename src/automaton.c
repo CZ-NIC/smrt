@@ -154,6 +154,7 @@ static const struct transition *prepare_image_offer(const char *ifname, struct e
 		.timeout_mult = 2,
 		.retries = 2,
 		.timeout_set = true,
+		.status_name = "upload firmware",
 		.packet = (uint8_t *)&offer,
 		.packet_size = sizeof offer,
 		.packet_send = true
@@ -430,6 +431,7 @@ static struct node_def defs[] = {
 					.timeout_mult = 2,
 					.retries = 5,
 					.timeout_set = true,
+					.status_name = "presence query",
 					.packet = ask_present_pkt,
 					.packet_size = sizeof ask_present_pkt,
 					.packet_send = true
@@ -482,6 +484,7 @@ static struct node_def defs[] = {
 					.timeout_mult = 2,
 					.retries = 4,
 					.timeout_set = true,
+					.status_name = "version query",
 					.packet = ask_version,
 					.packet_size = sizeof ask_version,
 					.packet_send = true
@@ -498,7 +501,8 @@ static struct node_def defs[] = {
 			[AC_ENTER] = {
 				.value = {
 					.timeout = 100,
-					.timeout_set = true
+					.timeout_set = true,
+					.status_name = "config"
 				}
 			},
 			[AC_TIMEOUT] = {
@@ -566,6 +570,7 @@ static struct node_def defs[] = {
 					.timeout_mult = 2,
 					.retries = 2,
 					.timeout_set = true,
+					.status_name = "activate",
 					.packet = enable_link,
 					.packet_size = sizeof enable_link,
 					.packet_send = true
@@ -663,6 +668,7 @@ static struct node_def defs[] = {
 					.timeout_add = -20,
 					.retries = 1,
 					.timeout_set = true,
+					.status_name = "reset",
 					.packet = cmd_reset,
 					.packet_size = sizeof cmd_reset,
 					.packet_send = true
@@ -680,7 +686,9 @@ static struct node_def defs[] = {
 	[AS_DEAD] = {
 		.actions = {
 			[AC_ENTER] = {
-				.hook = NULL // Just because we can't have empty initializer braces
+				.value = {
+					.status_name = "not present"
+				}
 			}
 		}
 	}

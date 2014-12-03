@@ -41,4 +41,7 @@ extern const char *fw_version;
 // Path where to put files describing status
 extern const char *status_path;
 
+// What is the path to status file for given interface. The result is freed by the next call to this function.
+const char *interface_status_path(const char *interface);
+
 #endif

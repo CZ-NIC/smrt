@@ -70,6 +70,7 @@ struct transition {
 	size_t packet_size;
 	bool packet_send;
 	const uint8_t *packet;
+	const char *status_name;
 };
 
 const struct transition *state_enter(const char *iface, enum autom_state state, struct extra_state *extra_state);

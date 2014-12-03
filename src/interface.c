@@ -20,6 +20,7 @@
 #include "util.h"
 #include "automaton.h"
 #include "proto_const.h"
+#include "configuration.h"
 
 #include <alloca.h>
 #include <stdlib.h>
@@ -32,6 +33,7 @@
 #include <linux/if_ether.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <stdio.h>
 
 // The MAC address of the device - this seems ugly, but can't be helped
 #define DEST_MAC {6, 5, 4, 3, 2, 1}
@@ -99,6 +101,9 @@ void interface_release(struct interface_state *interface) {
 	if (close(interface->fd) == -1)
 		die("Couldn't close interface's communication socket %d: %s\n", interface->fd, strerror(errno));
 	extra_state_destroy(interface->extra_state);
+	const char *path = interface_status_path(interface->ifname);
+	if (unlink(path) == -1)
+		die("Couldn't remove interface status file %s: %s\n", path, strerror(errno));
 	free(interface->ifname);
 	free(interface->packet);
 	free(interface);
@@ -171,6 +176,17 @@ static void transition_perform(struct interface_state *interface, uint64_t now, 
 	}
 	// Extra state (just store it)
 	interface->extra_state = transition->extra_state;
+	// Name of state
+	if (transition->status_name) {
+		const char *path = interface_status_path(interface->ifname);
+		FILE *f = fopen(path, "w");
+		if (!f)
+			die("Failed to write status to file %s: %s\n", path, strerror(errno));
+		fprintf(f, "<status>%s</status>\n", transition->status_name);
+		dbg("State %s\n", transition->status_name);
+		if (fclose(f) == EOF)
+			die("Failed to close status file %s: %s\n", path, strerror(errno));
+	}
 	// The state
 	if (transition->state_change) {
 		dbg("Changing state to %u\n", (unsigned)transition->new_state);
