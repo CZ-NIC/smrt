@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 enum action {
 	AC_ENTER,
@@ -297,10 +298,51 @@ struct state {
 	uint16_t len;
 	uint16_t seq;
 	uint32_t param;
-	uint16_t modulation;
+	uint8_t annex;
+	uint8_t standard;
 	uint8_t state;
+	uint8_t power;
+	uint8_t data_path;
+	uint32_t dsmax;
+	uint32_t usmax;
+	uint32_t dscur;
+	uint32_t uscur;
+	uint16_t dspower;
+	uint16_t uspower;
 	// There are other items, but we're not interested in them. So we may as well ignore them.
 } __attribute__((packed));
+
+static const char *const states[] = {
+	"idle",
+	"handshake",
+	"training",
+	"online",
+	"no signal",
+	"CRC error",
+	"disabled"
+};
+
+static const char *const standards[] = {
+	"T1.413",
+	"G992_1",
+	"G992_2",
+	"G992_3",
+	"G992_4",
+	"G992_5",
+	"G993_2"
+};
+
+static const char *const annexes[] = {
+	[0] = "None",
+	[1] = "A",
+	[1 << 1] = "B",
+	[1 << 2] = "C",
+	[1 << 3] = "I",
+	[1 << 4] = "J",
+	[1 << 5] = "L1",
+	[1 << 6] = "L2",
+	[1 << 7] = "M"
+};
 
 static const struct transition *check_state(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
 	(void)ifname;
@@ -310,6 +352,22 @@ static const struct transition *check_state(const char *ifname, struct extra_sta
 	if (st->cmd != CMD_ANSWER_PARAM || ntohs(st->seq) != 4 || ntohl(st->param) != PARAM_STATUS)
 		return NULL;
 	// If it is in up state, then everything is nice
+	const char *path = interface_status_path(ifname);
+	FILE *f = fopen(path, "w");
+	if (!f)
+		die("Couldn't write interface state file %s: %s\n", path, strerror(errno));
+	assert(st->state < sizeof states / sizeof *states);
+	fprintf(f, "<state>%s</state>\n", states[st->state]);
+	if (st->standard < sizeof standards / sizeof *standards)
+		fprintf(f, "<standard>%s</standard>\n", standards[st->standard]);
+	if (st->annex < sizeof annexes / sizeof *annexes)
+		fprintf(f, "<annex>%s</annex>\n", annexes[st->annex]);
+	fprintf(f, "<power-state>%hhu</power-state>\n", st->power);
+	fprintf(f, "<max-speed><down>%u</down><up>%u</up></max-speed>\n", ntohl(st->dsmax), ntohl(st->usmax));
+	fprintf(f, "<cur-speed><down>%u</down><up>%u</up></cur-speed>\n", ntohl(st->dscur), ntohl(st->uscur));
+	fprintf(f, "<power><down>%u</down><up>%u</up></power>\n", ntohl(st->dspower), ntohl(st->uspower));
+	if (fclose(f) == EOF)
+		die("Couldn't close interface state file %s: %s\n", path, strerror(errno));
 	if (st->state == STATE_OK) {
 		static struct transition result = {
 			.new_state = AS_WATCH,
