@@ -38,5 +38,7 @@ void configure(int argc, char *argv[]);
 
 extern const char *image_path;
 extern const char *fw_version;
+// Path where to put files describing status
+extern const char *status_path;
 
 #endif

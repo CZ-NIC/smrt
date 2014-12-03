@@ -44,11 +44,12 @@ static int getnum() {
 
 const char *image_path;
 const char *fw_version;
+const char *status_path;
 
 void configure(int argc, char *argv[]) {
 	int option;
 	int position = -1;
-	while ((option = getopt(argc, argv, "-i:c:f:v:h")) != -1) {
+	while ((option = getopt(argc, argv, "-i:c:f:v:hs:")) != -1) {
 		switch(option) {
 			case 'i':
 				netstate_add(optarg);
@@ -90,6 +91,9 @@ void configure(int argc, char *argv[]) {
 			case 'v':
 				fw_version = optarg;
 				break;
+			case 's':
+				status_path = optarg;
+				break;
 			case '?':
 			case 'h':
 				puts("Small Modem for Router Turris daemon\n");
@@ -97,6 +101,7 @@ void configure(int argc, char *argv[]) {
 				puts("-c <vlan> <vpi> <vci>\n");
 				puts("-f <firmware_image>\n");
 				puts("-v <firmware_version>\n");
+				puts("-s <status_path>\n");
 				exit(1);
 		}
 	}
