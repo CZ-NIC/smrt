@@ -40,6 +40,10 @@ through command line arguments.
   nothing is done. If it differs, modem is reset and new firmware is
   uploaded. Therefore, the firmware version provided must match the
   firmware.
+`-s`:: Path to a status directory. The daemon stores one file for each
+  watched interface that is up and it contains status information
+  about the modem on that interface. The content is pseudo-XML ‒ no
+  top-level document is present, but if put into one, it is valid XML.
 `-i`:: Interface name to watch for the modem. This may be specified
   multiple times. In such case, all the interfaces are watched for
   presence of modem. Be aware that the interface needs to be plugged
@@ -77,3 +81,38 @@ eth0.13).
 Many ISPs don't pass the internet directly through the line, but send
 it encapsulated in PPPoE protocol. In such case the pppd daemon needs
 to be running and configured to send the username and password.
+
+Status files
+------------
+
+The daemon stores files with status in the directory specified with
+`-s`. Each file is named after one interface and describes the status
+of modem present on that interface.
+
+There are several fields. The most important one is the „status“
+field, which can have these values:
+
+`presence query`:: The daemon tries to discover a modem on that
+ interface.
+`upload firmware`:: The modem is being fed with firmware.
+`version query`:: Version of the modem and its firmware is being
+ checked.
+`config`:: The modem is being configured.
+`activate`:: The modem was asked to activate the DSL interface.
+`disabled`:: The modem did not yet activate the DSL interface.
+`CRC error`:: There was an error detected inside the modem.
+`idle`:: The modem does nothing (this shouldn't happen in practice).
+`handshake`:: The modem negotiates with the DSLAM. This is part of
+ establishing the link.
+`training`:: The modem measures properties of the cables and tries
+ to guess what are the best modes to use.
+`no signal`:: The other side couldn't be reached. This may be
+ because the cable is not connected, the ISP is down or due to an error
+ on the path.
+`online`:: This is the desired state, when data get through.
+`reset`:: The modem is restarting.
+`not present`:: There was no modem discovered on that interface.
+
+Other fields describe the modes and connection properties when the
+connection is negotiated. They may be missing in case no connection is
+made yet, or they may be invalid in such case.
