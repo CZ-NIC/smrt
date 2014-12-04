@@ -365,7 +365,7 @@ static const struct transition *check_state(const char *ifname, struct extra_sta
 	fprintf(f, "<power-state>%hhu</power-state>\n", st->power);
 	fprintf(f, "<max-speed><down>%u</down><up>%u</up></max-speed>\n", ntohl(st->dsmax), ntohl(st->usmax));
 	fprintf(f, "<cur-speed><down>%u</down><up>%u</up></cur-speed>\n", ntohl(st->dscur), ntohl(st->uscur));
-	fprintf(f, "<power><down>%u</down><up>%u</up></power>\n", ntohl(st->dspower), ntohl(st->uspower));
+	fprintf(f, "<power><down>%u</down><up>%u</up></power>\n", ntohs(st->dspower), ntohs(st->uspower));
 	if (fclose(f) == EOF)
 		die("Couldn't close interface state file %s: %s\n", path, strerror(errno));
 	if (st->state == STATE_OK) {
