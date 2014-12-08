@@ -84,3 +84,11 @@ void netstate_set_hooks(link_hook up, link_hook down) {
 	up_hook = up;
 	down_hook = down;
 }
+
+void netstate_down(const char *name) {
+	for (size_t i = 0; i < interface_count; i ++)
+		if (strcmp(name, interfaces[i].name) == 0) {
+			interfaces[i].up = false;
+			return;
+		}
+}

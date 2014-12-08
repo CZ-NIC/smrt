@@ -175,6 +175,7 @@ int main(int argc, char *argv[]) {
 					die("Error on netlink descriptor %d: %s\n", t->fd, strerror(error));
 				else {
 					msg("Error on interface file descriptor %d/%s: %s, bringing down\n", t->fd, t->name, strerror(error));
+					netstate_down(t->name);
 					down(t->name);
 					// Try sniffing the interfaces, the state might be wrong
 					netlink_ready(NULL);

@@ -25,6 +25,8 @@ void netstate_init(void);
 void netstate_update(void);
 // Add another interface to be watched (if it exists)
 void netstate_add(const char *name);
+// Mark the interface as down externally
+void netstate_down(const char *name);
 
 typedef void (*link_hook)(const char *ifname);
 void netstate_set_hooks(link_hook up, link_hook down);
