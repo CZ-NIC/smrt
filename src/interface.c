@@ -102,8 +102,12 @@ void interface_release(struct interface_state *interface) {
 		die("Couldn't close interface's communication socket %d: %s\n", interface->fd, strerror(errno));
 	extra_state_destroy(interface->extra_state);
 	const char *path = interface_status_path(interface->ifname);
-	if (unlink(path) == -1)
-		die("Couldn't remove interface status file %s: %s\n", path, strerror(errno));
+	if (unlink(path) == -1) {
+		if (errno == ENOENT)
+			msg("File %s not removed as it doesn't exist\n", path);
+		else
+			die("Couldn't remove interface status file %s: %s\n", path, strerror(errno));
+	}
 	free(interface->ifname);
 	free(interface->packet);
 	free(interface);
