@@ -357,7 +357,7 @@ static const struct transition *check_state(const char *ifname, struct extra_sta
 	if (!f)
 		die("Couldn't write interface state file %s: %s\n", path, strerror(errno));
 	assert(st->state < sizeof states / sizeof *states);
-	fprintf(f, "<state>%s</state>\n", states[st->state]);
+	fprintf(f, "<status>%s</status>\n", states[st->state]);
 	if (st->standard < sizeof standards / sizeof *standards)
 		fprintf(f, "<standard>%s</standard>\n", standards[st->standard]);
 	if (st->annex < sizeof annexes / sizeof *annexes)
