@@ -667,10 +667,10 @@ static struct node_def defs[] = {
 		.actions = {
 			[AC_ENTER] = {
 				.value = {
-					// Ask every quarter of minute, up to 5 minutes
-					.timeout = 15 * 1000,
+					// Ask every second , up to 5 minutes
+					.timeout = 1000,
 					.timeout_mult = 1,
-					.retries = 19,
+					.retries = 79,
 					.timeout_set = true,
 					.packet = ask_state,
 					.packet_size = sizeof ask_state,
@@ -693,9 +693,9 @@ static struct node_def defs[] = {
 		.actions = {
 			[AC_ENTER] = {
 				.value = {
-					.timeout = 5 * 1000,
+					.timeout = 500,
 					.timeout_mult = 1,
-					.retries = 59, // Ask for whole 5 minutes
+					.retries = 599, // Ask for whole 5 minutes
 					.timeout_set = true,
 					.packet = ask_state,
 					.packet_size = sizeof ask_state,
