@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <syslog.h>
+#include <signal.h>
 
 struct epoll_tag {
 	void (*hook)(struct epoll_tag *tag);
@@ -115,11 +116,35 @@ static void update_now(void) {
 	now = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
 }
 
+// Terminate all the interfaces
+static void cleanup(void) {
+	while (interface_count)
+		down(interfaces[0].name);
+}
+
+static void cleanup_signal(int unused) {
+	(void)unused;
+	cleanup();
+	_Exit(0);
+}
+
+static int term_signals[] = { SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIGFPE, SIGSEGV, SIGPIPE, SIGALRM, SIGTERM };
+
 // We don't care about performance. But multiple events might mean trouble like releasing something and then using it from another event.
 #define MAX_EVENTS 1
 
 int main(int argc, char *argv[]) {
 	openlog("smrtd", 0, LOG_DAEMON);
+	// Clean up files and interfaces when exiting, either normally or by a signal
+	for (size_t i = 0; i < sizeof term_signals / sizeof *term_signals; i ++) {
+		struct sigaction action = {
+			.sa_handler = cleanup_signal,
+			.sa_flags = SA_NODEFER | SA_RESETHAND | SA_RESTART
+		};
+		if (sigaction(term_signals[i], &action, NULL) == -1)
+			die("Couldn't set signal %d: %s\n", term_signals[i], strerror(errno));
+	}
+	atexit(cleanup);
 	// Initialize epoll
 	poller = epoll_create(42 /* Man mandates this to be positive but otherwise without meaning */);
 	if (poller == -1)
