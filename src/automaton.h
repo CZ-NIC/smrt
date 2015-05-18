@@ -46,6 +46,10 @@ enum autom_state {
 	AS_ENABLE_LINK,
 	// We just started and wait for the first working state. We ask more often, mostly to make openwrt thing the link is not dead
 	AS_FIRST_START,
+	// Try again with all enabled annexes
+	AS_ALLOW_ALL,
+	// Like FIRST_START, but after ALLOW_ALL
+	AS_ALL_START,
 	// Watch it is still operating
 	AS_WATCH,
 	// Query status and decide if everything is OK

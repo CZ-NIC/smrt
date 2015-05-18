@@ -69,7 +69,7 @@ static const uint8_t enable_link[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x03, 0x
 static const uint8_t ask_state[] = { CMD_GET_PARAM, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, PARAM_STATUS };
 static const uint8_t cmd_reset[] = { CMD_SET_PARAM, 0x00, 0x05, 0x00, 0x05, 0x00, 0x00, 0x00, PARAM_RESET, 0x01 };
 // List allowed modes. This allows them all.
-static const uint8_t set_mode_all[] = { CMD_SET_PARAM, 0x00, 0x08, 0x00, 0x06, 0x00, 0x00, 0x00, PARAM_MODE, 0x00, 0x3F, 0x00, 0xF3 };
+static const uint8_t set_mode_all[] = { CMD_SET_PARAM, 0x00, 0x08, 0x00, 0x07, 0x00, 0x00, 0x00, PARAM_MODE, 0x00, 0x3F, 0x00, 0xF3 };
 // And this allows only few selected ones for O2
 static const uint8_t set_mode[] = { CMD_SET_PARAM, 0x00, 0x08, 0x00, 0x06, 0x00, 0x00, 0x00, PARAM_MODE, 0x00, 0x3F, 0x00, 0x12 };
 
@@ -293,6 +293,10 @@ static const struct transition *check_link_ack(const char *ifname, struct extra_
 
 static const struct transition *check_mode_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
 	return check_ack(ifname, state, packet, packet_size, 6, AS_SEND_CONFIG_CONN);
+}
+
+static const struct transition *check_mode_all_ack(const char *ifname, struct extra_state *state, const void *packet, size_t packet_size) {
+	return check_ack(ifname, state, packet, packet_size, 7, AS_ALL_START);
 }
 
 struct state {
@@ -692,6 +696,49 @@ static struct node_def defs[] = {
 		}
 	},
 	[AS_FIRST_START] = { // Just like AS_CONFIRM_WORKING, but asking more often and for longer time
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 500,
+					.timeout_mult = 1,
+					.retries = 599, // Ask for whole 5 minutes
+					.timeout_set = true,
+					.packet = ask_state,
+					.packet_size = sizeof ask_state,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = {
+				.value = {
+					.new_state = AS_ALLOW_ALL,
+					.state_change = true
+				}
+			},
+			[AC_PACKET] = {
+				.hook = check_state
+			}
+		}
+	},
+	[AS_ALLOW_ALL] = {
+		.actions = {
+			[AC_ENTER] = {
+				.value = {
+					.timeout = 100,
+					.timeout_mult = 2,
+					.retries = 4,
+					.timeout_set = true,
+					.packet = set_mode_all,
+					.packet_size = sizeof set_mode_all,
+					.packet_send = true
+				}
+			},
+			[AC_TIMEOUT] = ACTION_ASK_PRESENT,
+			[AC_PACKET] = {
+				.hook = check_mode_all_ack
+			}
+		}
+	},
+	[AS_ALL_START] = {
 		.actions = {
 			[AC_ENTER] = {
 				.value = {
